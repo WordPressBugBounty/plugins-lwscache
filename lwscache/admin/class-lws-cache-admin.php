@@ -317,9 +317,28 @@ class LWSCache_Admin
         $options = get_site_option(
             'rt_wp_lws_cache_options',
             array(
-                'redis_hostname' => '127.0.0.1',
-                'redis_port'     => '6379',
-                'redis_prefix'   => 'nginx-cache:',
+                'enable_purge'                     => 1,
+                'cache_method'                     => 'enable_fastcgi',
+                'purge_method'                     => 'get_request',
+                'enable_map'                       => 0,
+                'enable_log'                       => 1,
+                'log_level'                        => 'INFO',
+                'log_filesize'                     => '5',
+                'enable_stamp'                     => 0,
+                'purge_homepage_on_edit'           => 1,
+                'purge_homepage_on_del'            => 1,
+                'purge_archive_on_edit'            => 1,
+                'purge_archive_on_del'             => 1,
+                'purge_archive_on_new_comment'     => 1,
+                'purge_archive_on_deleted_comment' => 1,
+                'purge_page_on_mod'                => 1,
+                'purge_page_on_new_comment'        => 1,
+                'purge_page_on_deleted_comment'    => 1,
+                'redis_hostname'                   => '127.0.0.1',
+                'redis_port'                       => '6379',
+                'redis_prefix'                     => 'nginx-cache:',
+                'purge_url'                        => '',
+                'redis_enabled_by_constant'        => 0,
             )
         );
 
@@ -421,12 +440,12 @@ class LWSCache_Admin
         <ul role="list">
             <?php
             if (0 === $maxitems) {
-                echo '<li role="listitem">' . esc_html_e('No items', 'lwscache') . '.</li>';
+                echo '<li>' . esc_html_e('No items', 'lwscache') . '.</li>';
             } else {
                 // Loop through each feed item and display each item as a hyperlink.
                 foreach ($rss_items as $item) {
             ?>
-                    <li role="listitem">
+                    <li>
                         <?php
                         printf(
                             '<a href="%s" title="%s">%s</a>',
@@ -625,6 +644,10 @@ class LWSCache_Admin
     {
         global $blog_id, $nginx_purger;
 
+        if (!isset($this->options['future_posts'][$blog_id]) || !is_array($this->options['future_posts'][$blog_id])) {
+            return;
+        }
+
         if (
             !$this->options['enable_purge'] ||
             empty($this->options['future_posts']) ||
@@ -653,8 +676,9 @@ class LWSCache_Admin
      *
      * @param string $blog_id blog id.
      */
-    public function update_new_blog_options($blog_id)
+    public function update_new_blog_options($site)
     {
+        $blog_id = $site->site_id;
         global $nginx_purger;
 
         $nginx_purger->log("New site added ( id $blog_id )");
@@ -676,12 +700,14 @@ class LWSCache_Admin
     {
         global $nginx_purger, $wp;
 
-        $method = filter_input(INPUT_SERVER, 'REQUEST_METHOD', FILTER_SANITIZE_STRING);
+        $method = sanitize_text_field($_SERVER['REQUEST_METHOD']);
 
         if ('POST' === $method) {
-            $action = filter_input(INPUT_POST, 'lws_cache_action', FILTER_SANITIZE_STRING);
+            if (isset($_POST['lws_cache_action']))
+                $action = sanitize_text_field($_POST['lws_cache_action']);
         } else {
-            $action = filter_input(INPUT_GET, 'lws_cache_action', FILTER_SANITIZE_STRING);
+            if (isset($_GET['lws_cache_action']))
+                $action = sanitize_text_field($_GET['lws_cache_action']);
         }
 
         if (empty($action)) {

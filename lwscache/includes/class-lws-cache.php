@@ -176,24 +176,35 @@ class LWSCache
     {
         global $lws_cache_admin, $nginx_purger;
 
-        $cache_state = $GLOBALS['lwscache_state'];
-
         $lws_cache_admin = new LWSCache_Admin($this->get_plugin_name(), $this->get_version());
 
+        $nginx_settings = get_site_option('rt_wp_lws_cache_options', $lws_cache_admin->lws_cache_default_settings());
+
         // Defines global variables.
-        if (!empty($lws_cache_admin->options['cache_method']) && 'enable_redis' === $lws_cache_admin->options['cache_method']) {
+        if (! empty($lws_cache_admin->options['cache_method']) && 'enable_redis' === $lws_cache_admin->options['cache_method']) {
             if (class_exists('Redis')) { // Use PHP5-Redis extension if installed.
-                require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-phpredis-purger.php';
+                if (class_exists('PhpRedis_Purger')) {
+                    require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-phpredis-purger.php';
+                }
                 $nginx_purger = new PhpRedis_Purger();
             } else {
-                require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-predis-purger.php';
+                if (class_exists('Predis_Purger')) {
+                    require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-predis-purger.php';
+                }
                 $nginx_purger = new Predis_Purger();
             }
-        } elseif ($cache_state['state'] == "active" && $cache_state['type'] == "cpanel") {
-            require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-varnish-purger.php';
+        } else if (
+            isset($_SERVER['HTTP_X_CACHE_ENGINE_ENABLED']) && isset($_SERVER['HTTP_X_CACHE_ENGINE'])
+            && $_SERVER['HTTP_X_CACHE_ENGINE_ENABLED'] == '1' && $_SERVER['HTTP_X_CACHE_ENGINE'] == 'varnish'
+        ) {
+            if (!class_exists("Varnish_Purger")) {
+                require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-varnish-purger.php';
+            }
             $nginx_purger = new Varnish_Purger();
         } else {
-            require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-fastcgi-purger.php';
+            if (!class_exists("FastCGI_Purger")) {
+                require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-fastcgi-purger.php';
+            }
             $nginx_purger = new FastCGI_Purger();
         }
 
@@ -216,19 +227,33 @@ class LWSCache
         $this->loader->add_action('shutdown', $lws_cache_admin, 'add_timestamps', 99999);
         $this->loader->add_action('add_init', $lws_cache_admin, 'update_map');
 
-        // Add actions to purge.
-        $this->loader->add_action('wp_insert_comment', $nginx_purger, 'purge_post_on_comment', 200, 2);
-        $this->loader->add_action('transition_comment_status', $nginx_purger, 'purge_post_on_comment_change', 200, 3);
-        $this->loader->add_action('transition_post_status', $lws_cache_admin, 'set_future_post_option_on_future_status', 20, 3);
-        $this->loader->add_action('delete_post', $lws_cache_admin, 'unset_future_post_option_on_delete', 20, 1);
-        $this->loader->add_action('rt_wp_lws_cache_check_log_file_size_daily', $nginx_purger, 'check_and_truncate_log_file', 100, 1);
-        $this->loader->add_action('edit_attachment', $nginx_purger, 'purge_image_on_edit', 100, 1);
-        $this->loader->add_action('wpmu_new_blog', $lws_cache_admin, 'update_new_blog_options', 10, 1);
-        $this->loader->add_action('transition_post_status', $nginx_purger, 'purge_on_post_moved_to_trash', 20, 3);
-        $this->loader->add_action('edit_term', $nginx_purger, 'purge_on_term_taxonomy_edited', 20, 3);
-        $this->loader->add_action('delete_term', $nginx_purger, 'purge_on_term_taxonomy_edited', 20, 3);
-        $this->loader->add_action('check_ajax_referer', $nginx_purger, 'purge_on_check_ajax_referer', 20);
-        $this->loader->add_action('admin_bar_init', $lws_cache_admin, 'purge_all');
+        $purge = $nginx_settings['enable_purge'];
+        if ($purge) {
+            // Add actions to purge.
+            $this->loader->add_action('wp_insert_comment', $nginx_purger, 'purge_post_on_comment', 200, 2);
+            $this->loader->add_action('transition_comment_status', $nginx_purger, 'purge_post_on_comment_change', 200, 3);
+            $this->loader->add_action('transition_post_status', $lws_cache_admin, 'set_future_post_option_on_future_status', 20, 3);
+            $this->loader->add_action('delete_post', $lws_cache_admin, 'unset_future_post_option_on_delete', 20, 1);
+            $this->loader->add_action('rt_wp_lws_cache_check_log_file_size_daily', $nginx_purger, 'check_and_truncate_log_file', 100, 1);
+            $this->loader->add_action('edit_attachment', $nginx_purger, 'purge_image_on_edit', 100, 1);
+            $this->loader->add_action('wp_initialize_site', $lws_cache_admin, 'update_new_blog_options', 10, 1);
+            $this->loader->add_action('transition_post_status', $nginx_purger, 'purge_on_post_moved_to_trash', 20, 3);
+            $this->loader->add_action('edit_term', $nginx_purger, 'purge_on_term_taxonomy_edited', 20, 3);
+            $this->loader->add_action('delete_term', $nginx_purger, 'purge_on_term_taxonomy_edited', 20, 3);
+            $this->loader->add_action('check_ajax_referer', $nginx_purger, 'purge_on_check_ajax_referer', 20);
+            $this->loader->add_action('admin_bar_init', $lws_cache_admin, 'purge_all');
+
+            // Remove the cache on the page currently getting modified/deleted
+            $this->loader->add_action('wp_insert_post', $nginx_purger, 'purge_post_optimize', 10, 2);
+            $this->loader->add_action('edit_post', $nginx_purger, 'purge_post_optimize', 10, 2);
+            $this->loader->add_action('save_post', $nginx_purger, 'purge_post_optimize', 10, 2);
+
+            $this->loader->add_action('deleted_post', $nginx_purger, 'purge_post_optimize_2', 10, 2);
+            $this->loader->add_action('trashed_post', $nginx_purger, 'purge_post_optimize_2', 10, 2);
+            $this->loader->add_action('spammed_post', $nginx_purger, 'purge_post_optimize_2', 10, 2);
+            $this->loader->add_action('unspammed_post', $nginx_purger, 'purge_post_optimize_2', 10, 2);
+            $this->loader->add_action('untrashed_post', $nginx_purger, 'purge_post_optimize_2', 10, 2);
+        }
 
         // expose action to allow other plugins to purge the cache.
         $this->loader->add_action('rt_lws_cache_purge_all', $nginx_purger, 'purge_all');

@@ -4,11 +4,11 @@
  * Plugin Name:       LWSCache
  * Plugin URI:        https://www.lws.fr/
  * Description:       Cleans nginx's proxy cache whenever a post is edited/published.
- * Version:           2.8.4
+ * Version:           2.8.5
  * Author:            LWS
  * Author URI:        https://www.lws.fr
  * Requires at least: 5.0
- * Tested up to:      6.6
+ * Tested up to:      6.7
  *
  * @link              https://www.lws.fr
  * @since             1.0
