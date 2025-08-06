@@ -8,7 +8,7 @@
  * Author:            LWS
  * Author URI:        https://www.lws.fr
  * Requires at least: 5.0
- * Tested up to:      6.7
+ * Tested up to:      6.8
  *
  * @link              https://www.lws.fr
  * @since             1.0

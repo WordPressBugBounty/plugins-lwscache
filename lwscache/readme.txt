@@ -1,7 +1,7 @@
 === LWSCache ===
 Contributors: aurelienlws
 Tags: LWS, cache, nginx
-Tested up to: 6.7
+Tested up to: 6.8
 Stable tag: 2.8.5
 Requires PHP: 7.0
 License: GPLv2 or later
