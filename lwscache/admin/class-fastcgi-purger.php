@@ -5,14 +5,14 @@
  * @link       https://www.lws.fr
  * @since      1.0
  *
- * @package    
+ * @package
  * @subpackage /admin
  */
 
 /**
  * Description of FastCGI_Purger
  *
- * @package    
+ * @package
  * @subpackage /admin
  * @author     rtCamp
  */
@@ -26,71 +26,15 @@ class FastCGI_Purger extends Purger {
 	 */
 	public function purge_url( $url, $feed = true ) {
 
-		global $lws_cache_admin;
+		// Purge the specific URL that was passed to this method
+		wp_remote_request($url, array('method' => 'PURGE'));
 
-		/**
-		 * Filters the URL to be purged.
-		 *
-		 * @since 1.0
-		 *
-		 * @param string $url URL to be purged.
-		 */
-		$url = apply_filters( 'rt_lws_cache_purge_url', $url );
+		// If the URL is using HTTPS, also try HTTP version and vice versa
+		$alt_scheme_url = (strpos($url, 'https://') === 0)
+			? str_replace('https://', 'http://', $url)
+			: str_replace('http://', 'https://', $url);
 
-		$this->log( '- Purging URL | ' . $url );
-
-		$parse = wp_parse_url( $url );
-
-		if ( ! isset( $parse['path'] ) ) {
-			$parse['path'] = '';
-		}
-
-		switch ( $lws_cache_admin->options['purge_method'] ) {
-
-			case 'unlink_files':
-				$_url_purge_base = $parse['scheme'] . '://' . $parse['host'] . $parse['path'];
-				$_url_purge      = $_url_purge_base;
-
-				if ( ! empty( $parse['query'] ) ) {
-					$_url_purge .= '?' . $parse['query'];
-				}
-
-				$this->delete_cache_file_for( $_url_purge );
-
-				if ( $feed ) {
-
-					$feed_url = rtrim( $_url_purge_base, '/' ) . '/feed/';
-					$this->delete_cache_file_for( $feed_url );
-					$this->delete_cache_file_for( $feed_url . 'atom/' );
-					$this->delete_cache_file_for( $feed_url . 'rdf/' );
-
-				}
-				break;
-
-			case 'get_request':
-				// Go to default case.
-			default:
-				$_url_purge_base = $this->purge_base_url() . $parse['path'];
-				$_url_purge      = $_url_purge_base;
-
-				if ( isset( $parse['query'] ) && '' !== $parse['query'] ) {
-					$_url_purge .= '?' . $parse['query'];
-				}
-
-				$this->do_remote_get( $_url_purge );
-
-				if ( $feed ) {
-
-					$feed_url = rtrim( $_url_purge_base, '/' ) . '/feed/';
-					$this->do_remote_get( $feed_url );
-					$this->do_remote_get( $feed_url . 'atom/' );
-					$this->do_remote_get( $feed_url . 'rdf/' );
-
-				}
-				break;
-
-		}
-
+		wp_remote_request($alt_scheme_url, array('method' => 'PURGE'));
 	}
 
 	/**
@@ -166,33 +110,11 @@ class FastCGI_Purger extends Purger {
 	 */
 	public function purge_all() {
 
-		global $lws_cache_admin;
+		wp_remote_request(get_site_url(null, '', 'https') . "/*", array('method' => 'PURGE'));
+		wp_remote_request(get_site_url(null, '', 'http') . "/*", array('method' => 'PURGE'));
 
-		switch ( $lws_cache_admin->options['purge_method'] ) {
-		
-			case 'unlink_files':
-				$this->unlink_recursive( RT_WP_LWS_CACHE_CACHE_PATH, false );
-				$this->log( '* * * * *' );
-				$this->log( '* Purged Everything ici!' );
-				$this->log( '* * * * *' );
-				break;
-			
-			case 'get_request':
-			// Go to default case.
-			default:
-				$_url_purge_base = $this->purge_base_url();
-
-				$this->log( '- Purging all URLs' );
-				$this->do_remote_get( $_url_purge_base . '/*' );
-				break;
-		}
-
-		/**
-		 * Fire an action after the FastCGI cache has been purged.
-		 *
-		 * @since 1.0
-		 */
-		do_action( 'rt_lws_cache_after_fastcgi_purge_all' );
+		wp_remote_request(get_site_url(null, '', 'https') . "/*", array('method' => 'FULLPURGE'));
+		wp_remote_request(get_site_url(null, '', 'http') . "/*", array('method' => 'FULLPURGE'));
 	}
 
 	/**

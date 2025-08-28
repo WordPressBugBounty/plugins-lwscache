@@ -211,7 +211,7 @@ if ($cache_state['type'] == "cpanel") {
         </div>
     </div>
 
-    <?php // Check if LWSCache or FC are activated ; on cPanel, allow its activation ; on LWSPanel, just say you need to activate it ; on others, not compatible 
+    <?php // Check if LWSCache or FC are activated ; on cPanel, allow its activation ; on LWSPanel, just say you need to activate it ; on others, not compatible
     ?>
     <?php if ($cache_state['state'] == "unavailable") : ?>
         <div class="notif_cache">
@@ -451,6 +451,7 @@ if ($cache_state['type'] == "cpanel") {
             if (!success) {
                 if (response.data.errorCode == 'folder_exists') {
                     var data = {
+                        _ajax_nonce: '<?php echo esc_attr(wp_create_nonce('activate_plugin_slug')); ?>',
                         action: "lwscache_activatePlugin",
                         ajax_slug: slug,
                     };

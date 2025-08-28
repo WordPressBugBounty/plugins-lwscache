@@ -2,7 +2,7 @@
 Contributors: aurelienlws
 Tags: LWS, cache, nginx
 Tested up to: 6.8
-Stable tag: 2.8.5
+Stable tag: 2.9
 Requires PHP: 7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -266,3 +266,6 @@ There are 3 different ways to install LWS Cache (as with any other wordpress.org
 = 2.8.4 =
 * Fixed support for Varnish FastestCache on cPanel not getting recognized by the plugin
 * Changed design of the warning box for when cache is not found/activated
+
+= 2.9 =
+* Fixed vulnerability in some AJAX calls

@@ -4,7 +4,7 @@
  * Plugin Name:       LWSCache
  * Plugin URI:        https://www.lws.fr/
  * Description:       Cleans nginx's proxy cache whenever a post is edited/published.
- * Version:           2.8.5
+ * Version:           2.9
  * Author:            LWS
  * Author URI:        https://www.lws.fr
  * Requires at least: 5.0
@@ -12,7 +12,7 @@
  *
  * @link              https://www.lws.fr
  * @since             1.0
- * @package           
+ * @package
  */
 
 // If this file is called directly, abort.
@@ -76,7 +76,7 @@ $check_plugins = array(
 //         if (is_plugin_active( $plugin )) {
 //             add_action( 'admin_notices', 'lwscache_other_cache_plugin' );
 //             break;
-//         }        
+//         }
 //     }
 // }
 // add_action( 'admin_init', 'lwscache_check_compatibility' );
@@ -401,6 +401,12 @@ add_action("wp_ajax_lwscache_downloadPlugin", "wp_ajax_install_plugin");
 add_action("wp_ajax_lwscache_activatePlugin", "lwscache_activate_plugin");
 function lwscache_activate_plugin()
 {
+    check_ajax_referer('activate_plugin_slug', '_ajax_nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
+    }
+
     if (isset($_POST['ajax_slug'])) {
         switch (sanitize_textarea_field($_POST['ajax_slug'])) {
             case 'lws-hide-login':
@@ -436,6 +442,11 @@ add_action("wp_ajax_lwscache_change_cache_state", "lwscache_change_cache_state")
 function lwscache_change_cache_state()
 {
     check_ajax_referer('fastest_cache_change_state', '_ajax_nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
+    }
+
     if (isset($_POST['cache_state'])) {
         $state = sanitize_text_field($_POST['cache_state']);
         $array = (explode('/', ABSPATH));
@@ -462,6 +473,11 @@ add_action("wp_ajax_change_autopurge", "lwscache_change_autopurge");
 function lwscache_change_autopurge()
 {
     check_ajax_referer('lwscache_change_autopurge_nonce', '_ajax_nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
+    }
+
     if (isset($_POST['state'])) {
         global $lws_cache_admin;
 
@@ -490,6 +506,9 @@ add_action("wp_ajax_lwscache_get_excluded_url", "lwscache_exclude_urls");
 function lwscache_exclude_urls()
 {
     check_ajax_referer('lwscache_get_excluded_nonce', '_ajax_nonce');
+    if (!current_user_can('manage_options')) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
+    }
     wp_die(json_encode(array('code' => "SUCCESS", 'data' => get_site_option('lwscache_excluded_urls', array()), 'domain' => site_url()), JSON_PRETTY_PRINT));
 }
 
@@ -497,6 +516,10 @@ add_action("wp_ajax_lwscache_save_excluded_url", "lwscache_save_urls");
 function lwscache_save_urls()
 {
     check_ajax_referer('lwscache_save_excluded_nonce', '_ajax_nonce');
+    if (!current_user_can('manage_options')) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
+    }
+
     if (isset($_POST['data'])) {
         $urls = array();
 
